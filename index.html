@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Emotion Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --ink: #0d1117;
+    --paper: #f0ece1;
+    --line: #d8d0bd;
+    --signal: #3d5a80;
+    --signal-bright: #5f87b5;
+    --warn: #c1502e;
+    --neutral: #8a8377;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  header {
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 48px;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--signal);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
+  .sub {
+    margin-top: 12px;
+    color: var(--neutral);
+    font-size: 15px;
+    max-width: 44ch;
+  }
+
+  main {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .deck {
+    background: #fbf9f3;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 32px;
+    position: relative;
+  }
+
+  .deck::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--signal);
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 14px 22px;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  button.primary {
+    background: var(--signal);
+    color: #fff;
+    border-color: var(--signal);
+  }
+
+  button.primary:hover:not(:disabled) {
+    background: var(--signal-bright);
+    border-color: var(--signal-bright);
+  }
+
+  button.recording {
+    background: var(--warn);
+    border-color: var(--warn);
+    color: #fff;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  #fileInput { display: none; }
+
+  .waveform {
+    margin-top: 24px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: 1px dashed var(--line);
+    border-radius: 2px;
+    padding: 0 16px;
+  }
+
+  .bar {
+    width: 3px;
+    background: var(--line);
+    border-radius: 1px;
+    height: 8px;
+    transition: height 0.1s ease, background 0.2s ease;
+  }
+
+  .waveform.active .bar {
+    background: var(--signal);
+  }
+
+  .status-line {
+    margin-top: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--neutral);
+    min-height: 16px;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--line);
+    margin: 32px 0;
+  }
+
+  .result {
+    display: none;
+  }
+
+  .result.visible {
+    display: block;
+  }
+
+  .result-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .emotion-label {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .confidence {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--neutral);
+  }
+
+  .bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 48px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--neutral);
+  }
+
+  .bar-track {
+    height: 8px;
+    background: var(--line);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--signal);
+    width: 0%;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .bar-fill.top { background: var(--warn); }
+
+  .bar-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-align: right;
+    color: var(--neutral);
+  }
+
+  .config {
+    margin-top: 28px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--neutral);
+  }
+
+  .config label {
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .config input {
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--ink);
+  }
+
+  .config input:focus {
+    outline: none;
+    border-color: var(--signal);
+  }
+
+  footer {
+    margin-top: 40px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--neutral);
+    text-align: center;
+    max-width: 640px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Speech Emotion Recognition · Fine-tuned Wav2Vec2</div>
+  <h1>Voice Emotion Analyzer</h1>
+  <p class="sub">Record or upload a short voice clip. The model classifies it into one of eight emotions.</p>
+</header>
+
+<main>
+  <div class="deck">
+    <div class="controls">
+      <button id="recordBtn" class="primary">● Record</button>
+      <button id="uploadBtn">Upload file</button>
+      <input type="file" id="fileInput" accept="audio/*">
+      <button id="analyzeBtn" disabled>Analyze →</button>
+    </div>
+
+    <div class="waveform" id="waveform">
+      <div class="bar" style="height:10px"></div>
+      <div class="bar" style="height:22px"></div>
+      <div class="bar" style="height:14px"></div>
+      <div class="bar" style="height:30px"></div>
+      <div class="bar" style="height:18px"></div>
+      <div class="bar" style="height:26px"></div>
+      <div class="bar" style="height:12px"></div>
+      <div class="bar" style="height:20px"></div>
+      <div class="bar" style="height:16px"></div>
+      <div class="bar" style="height:28px"></div>
+      <div class="bar" style="height:10px"></div>
+      <div class="bar" style="height:24px"></div>
+    </div>
+
+    <div class="status-line mono" id="statusLine">Waiting for audio input.</div>
+
+    <div class="divider"></div>
+
+    <div class="result" id="result">
+      <div class="result-top">
+        <div class="emotion-label" id="emotionLabel">—</div>
+        <div class="confidence mono" id="confidenceText"></div>
+      </div>
+      <div class="bars" id="bars"></div>
+    </div>
+
+    <div class="config">
+      <label for="apiUrl">Backend endpoint (your FastAPI /predict URL)</label>
+      <input type="text" id="apiUrl" placeholder="https://your-backend.example.com/predict" value="http://localhost:8000/predict">
+    </div>
+  </div>
+</main>
+
+<footer>
+  Model: facebook/wav2vec2-base, last 3 encoder layers fine-tuned on RAVDESS.
+  Actor-independent evaluation — mean accuracy 53.96% (±5.97%) across 6-fold GroupKFold,
+  76.85% on this specific held-out split. Audio is sent to your backend for inference; nothing is stored client-side.
+</footer>
+
+<script>
+  const EMOTIONS = ["Neutral", "Calm", "Happy", "Sad", "Angry", "Fear", "Disgust", "Surprised"];
+
+  const recordBtn = document.getElementById('recordBtn');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const fileInput = document.getElementById('fileInput');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const waveform = document.getElementById('waveform');
+  const statusLine = document.getElementById('statusLine');
+  const result = document.getElementById('result');
+  const emotionLabel = document.getElementById('emotionLabel');
+  const confidenceText = document.getElementById('confidenceText');
+  const barsContainer = document.getElementById('bars');
+  const apiUrlInput = document.getElementById('apiUrl');
+
+  let mediaRecorder;
+  let audioChunks = [];
+  let recordedBlob = null;
+  let isRecording = false;
+  let waveInterval = null;
+
+  function animateWaveform(active) {
+    const bars = waveform.querySelectorAll('.bar');
+    waveform.classList.toggle('active', active);
+    if (active) {
+      waveInterval = setInterval(() => {
+        bars.forEach(b => b.style.height = (6 + Math.random() * 34) + 'px');
+      }, 120);
+    } else {
+      clearInterval(waveInterval);
+      bars.forEach(b => b.style.height = '14px');
+    }
+  }
+
+  recordBtn.addEventListener('click', async () => {
+    if (!isRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          analyzeBtn.disabled = false;
+          statusLine.textContent = 'Clip captured — ready to analyze.';
+          stream.getTracks().forEach(t => t.stop());
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.textContent = '■ Stop';
+        recordBtn.classList.add('recording');
+        statusLine.textContent = 'Recording…';
+        animateWaveform(true);
+      } catch (err) {
+        statusLine.textContent = 'Microphone access denied or unavailable.';
+      }
+    } else {
+      mediaRecorder.stop();
+      isRecording = false;
+      recordBtn.textContent = '● Record';
+      recordBtn.classList.remove('recording');
+      animateWaveform(false);
+    }
+  });
+
+  uploadBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      recordedBlob = fileInput.files[0];
+      analyzeBtn.disabled = false;
+      statusLine.textContent = `File loaded: ${recordedBlob.name}`;
+    }
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!recordedBlob) return;
+    const apiUrl = apiUrlInput.value.trim();
+    if (!apiUrl) {
+      statusLine.textContent = 'Set your backend endpoint below first.';
+      return;
+    }
+
+    analyzeBtn.disabled = true;
+    statusLine.textContent = 'Sending to model…';
+    result.classList.remove('visible');
+
+    const formData = new FormData();
+    formData.append('file', recordedBlob, 'clip.wav');
+
+    try {
+      const res = await fetch(apiUrl, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      renderResult(data);
+      statusLine.textContent = 'Done.';
+    } catch (err) {
+      statusLine.textContent = 'Request failed: ' + err.message + ' — check the backend URL and CORS settings.';
+    } finally {
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  function renderResult(data) {
+    // Expected shape: { probabilities: [8 floats], labels: [8 strings] }
+    const probs = data.probabilities || data.probs;
+    const labels = data.labels || EMOTIONS;
+    if (!probs || probs.length !== 8) {
+      statusLine.textContent = 'Unexpected response shape from backend.';
+      return;
+    }
+
+    const maxIdx = probs.indexOf(Math.max(...probs));
+    emotionLabel.textContent = labels[maxIdx];
+    confidenceText.textContent = (probs[maxIdx] * 100).toFixed(1) + '% confidence';
+
+    const sorted = probs.map((p, i) => ({ label: labels[i], p })).sort((a, b) => b.p - a.p);
+
+    barsContainer.innerHTML = '';
+    sorted.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <div class="bar-label">${item.label}</div>
+        <div class="bar-track"><div class="bar-fill ${idx === 0 ? 'top' : ''}" style="width:0%"></div></div>
+        <div class="bar-pct">${(item.p * 100).toFixed(1)}%</div>
+      `;
+      barsContainer.appendChild(row);
+      requestAnimationFrame(() => {
+        row.querySelector('.bar-fill').style.width = (item.p * 100) + '%';
+      });
+    });
+
+    result.classList.add('visible');
+  }
+</script>
+
+</body>
+</html>
