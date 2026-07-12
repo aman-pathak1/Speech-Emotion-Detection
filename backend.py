@@ -107,7 +107,16 @@ def load_model():
 
 
 def preprocess_audio(audio_bytes: bytes) -> np.ndarray:
-    y, sr = librosa.load(io.BytesIO(audio_bytes), sr=TARGET_SR, mono=True)
+    import tempfile, os as _os
+    # Write to a temp file so librosa/audioread/ffmpeg can sniff the real format
+    # instead of relying on an in-memory buffer, which is unreliable for webm/opus.
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+    try:
+        y, sr = librosa.load(tmp_path, sr=TARGET_SR, mono=True)
+    finally:
+        _os.remove(tmp_path)
     y = librosa.util.normalize(y)
     if len(y) > MAX_LEN:
         y = y[:MAX_LEN]
